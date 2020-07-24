@@ -214,8 +214,9 @@ module.exports = {
                                 {
                                     label: 'Sell trend',
                                     data: trendData,
-                                    backgroundColor: '#5402f9',
-                                    borderColor: '#5402f9',
+                                    backgroundColor: '#5402f980',
+                                    borderColor: '#5402f980',
+                                    borderDash: [10,5],
                                     fill: false,
                                     borderWidth: 1,
                                     pointRadius: 0
