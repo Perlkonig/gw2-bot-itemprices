@@ -88,7 +88,6 @@ module.exports = {
                 message.channel.send("No pricing data was found. Are you sure this item is tradeable?");
                 return;
             }
-            console.log(data);
 
             var oldest = new Date();
             oldest.setDate(oldest.getDate() - days);
