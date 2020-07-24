@@ -1,0 +1,7 @@
+config.json
+db/
+node_modules
+
+scratch.js
+graph.png
+run.sh
