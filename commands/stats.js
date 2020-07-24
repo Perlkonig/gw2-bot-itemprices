@@ -226,7 +226,7 @@ module.exports = {
                         options: {
                             title: {
                                 display: true,
-                                text: 'Price History'
+                                text: 'Price History – ' + item.name
                             },
                             scales: {
                                 xAxes: [{
