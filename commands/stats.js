@@ -102,8 +102,8 @@ module.exports = {
             pruned = {human: [], buy: [], sell: []}
             for (let i = 0; i < data.human.length; i++) {
                 const human = data.human[i];
-                const buy = data.buy[i];
-                const sell = data.sell[i];
+                const buy = data.buy[i] / 10000;
+                const sell = data.sell[i] / 10000;
 
                 // First 2 are kept no matter what
                 if (i < 2) {
@@ -131,14 +131,14 @@ module.exports = {
             const medBuy = Math.round(ss.median(pruned.buy));
             const avgBuy = Math.round(ss.mean(pruned.buy));
             const stdBuy = ss.standardDeviation(pruned.buy);
-            const lastBuy = data.buy[pruned.buy.length - 1];
+            const lastBuy = data.buy[pruned.buy.length - 1] / 10000;
             const zBuy = Math.round(((lastBuy - avgBuy) / stdBuy) * 10000) / 10000;
             const minSell = ss.min(pruned.sell)
             const maxSell = ss.max(pruned.sell);
             const medSell = Math.round(ss.median(pruned.sell));
             const avgSell = Math.round(ss.mean(pruned.sell));
             const stdSell = ss.standardDeviation(pruned.sell);
-            const lastSell = data.sell[pruned.sell.length - 1];
+            const lastSell = data.sell[pruned.sell.length - 1] / 10000;
             const zSell = Math.round(((lastSell - avgSell) / stdSell) * 10000) / 10000;
 
             // Calculate trendline
@@ -165,6 +165,7 @@ module.exports = {
                             data: [pruned.sell],
                             backgroundColor: '#f9a60240',
                             borderColor: '#f9a602',
+                            medianColor: '#5402f9',
                             borderWidth: 1,
                             itemStyle: 'circle',
                             itemRadius: 3,
@@ -178,6 +179,15 @@ module.exports = {
                         title: {
                             display: true,
                             text: 'Sell Prices'
+                        },
+                        scales: {
+                            xAxes: [{
+                                display: true,
+                                scaleLabel: {
+                                    display: true,
+                                    labelString: 'Price in gold'
+                                }
+                            }],
                         }
                     }
                 };            
@@ -240,7 +250,7 @@ module.exports = {
                                     display: true,
                                     scaleLabel: {
                                         display: true,
-                                        labelString: 'Price'
+                                        labelString: 'Price in gold'
                                     }
                                 }]
                             }
