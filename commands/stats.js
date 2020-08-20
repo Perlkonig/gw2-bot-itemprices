@@ -78,6 +78,7 @@ module.exports = {
             item = row;
         }
 
+        message.channel.send("Fetching price history. This may take a few seconds.");
         // We should now have a validated item ID. Scrape it.
         scrape(item.id)
         .then ((data) => {
@@ -96,20 +97,23 @@ module.exports = {
             data.timestamps = data.timestamps.slice(wanted.length * -1);
             data.sell = data.sell.slice(wanted.length * -1);
             data.buy = data.buy.slice(wanted.length * -1);
+            data.supply = data.supply.slice(wanted.length * -1);
             data.human = Array.from(data.timestamps, x => moment(x).format("YYYY-MM-DD\u00A0HH:mma"));
 
             // Prune overrepresented days to just first two entries
-            pruned = {human: [], buy: [], sell: []}
+            pruned = {human: [], buy: [], sell: [], supply: []};
             for (let i = 0; i < data.human.length; i++) {
                 const human = data.human[i];
                 const buy = data.buy[i] / 10000;
                 const sell = data.sell[i] / 10000;
+                const supply = data.supply[i];
 
                 // First 2 are kept no matter what
                 if (i < 2) {
                     pruned.human.push(human);
                     pruned.buy.push(buy);
                     pruned.sell.push(sell);
+                    pruned.supply.push(supply)
                 } else {
                     // If this date is the same as the previous two, skip it.
                     const prev1 = pruned.human[pruned.human.length-1].slice(0,10);
@@ -120,6 +124,7 @@ module.exports = {
                         pruned.human.push(human);
                         pruned.buy.push(buy);
                         pruned.sell.push(sell);
+                        pruned.supply.push(supply);
                     }
                 }
             }
@@ -140,6 +145,13 @@ module.exports = {
             const stdSell = ss.standardDeviation(pruned.sell);
             const lastSell = data.sell[pruned.sell.length - 1] / 10000;
             const zSell = Math.round(((lastSell - avgSell) / stdSell) * 10000) / 10000;
+            const minSupply = ss.min(pruned.supply)
+            const maxSupply = ss.max(pruned.supply);
+            const medSupply = ss.median(pruned.supply);
+            const avgSupply = ss.mean(pruned.supply);
+            const stdSupply = ss.standardDeviation(pruned.supply);
+            const lastSupply = data.supply[pruned.supply.length - 1];
+            const zSupply = Math.round(((lastSupply - avgSupply) / stdSupply) * 10000) / 10000;
 
             // Calculate trendline
             // Build the input array
@@ -261,51 +273,102 @@ module.exports = {
                     // return canvasRenderService.renderToStream(configuration);
                 })()
                 .then((figs) => {
-                    return mergeImages([
-                        {src: figs[1], x: 0, y: 0},
-                        {src: figs[0], x: 0, y:401}
-                    ], {Canvas: Canvas,Image: Image, height: 800});
+                    (async () => {
+                        const configuration = {
+                            type: 'line',
+                            data: {
+                                labels: pruned.human,
+                                datasets: [
+                                    {
+                                        label: 'Supply',
+                                        data: pruned.supply,
+                                        backgroundColor: '#ae8c01',
+                                        borderColor: '#ae8c01',
+                                        fill: false,
+                                        borderWidth: 1,
+                                        pointRadius: 0,
+                                    },
+                                ]
+                            },
+                            options: {
+                                title: {
+                                    display: true,
+                                    text: 'Supply History – ' + item.name
+                                },
+                                scales: {
+                                    xAxes: [{
+                                        display: true,
+                                        scaleLabel: {
+                                            display: true,
+                                            labelString: 'Date'
+                                        }
+                                    }],
+                                    yAxes: [{
+                                        display: true,
+                                        scaleLabel: {
+                                            display: true,
+                                            labelString: 'Supply levels'
+                                        }
+                                    }]
+                                }
+                            }
+                        };            
+                        return [...figs, await canvasRenderService.renderToBuffer(configuration)];
+                        // return await canvasRenderService.renderToDataURL(configuration);
+                        // return canvasRenderService.renderToStream(configuration);
+                    })()
+                    .then((figs) => {
+                        return mergeImages([
+                            {src: figs[1], x: 0, y: 0},
+                            {src: figs[2], x: 0, y:400},
+                            {src: figs[0], x: 0, y:800}
+                        ], {Canvas: Canvas,Image: Image, height: 1200});
+                    })
+                    .then((b64) => {
+                        var matches = b64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/),
+                        response = {};
+    
+                        if (matches.length !== 3) {
+                            return new Error('Invalid input string');
+                        }
+    
+                        response.type = matches[1];
+                        response.data = new Buffer.from(matches[2], 'base64');
+    
+                        return response.data;
+                    })
+                    .then((img) => {
+                        // Generate embed
+                        const attachment = new Discord.MessageAttachment(img, 'graphs.png');
+            
+                        const embed = new Discord.MessageEmbed()
+                        .setColor('#f9a602')
+                        .setTitle('GW2 Price Checker')
+                        .setURL('https://github.com/Perlkonig/gw2-bot-itemprices')
+                        // .setAuthor('Aaron Dalton', undefined, 'https://www.perlkonig.com')
+                        .setDescription(item.name)
+                        // .setThumbnail('https://i.imgur.com/wSTFkRM.png')
+                        .addField(pruned.buy.length + " datapoints over " + days + " days (" + dateFirst + " to " + dateLast + ")", "\u200B")
+                        .addField("Sell Range", minSell + "–" + maxSell, true)
+                        .addField("Sell Median", medSell, true)
+                        .addField("Last sell price", lastSell, true)
+                        .addField("Sell Z-score*", zSell, false)
+                        .addField("Buy Range", minBuy + "–" + maxBuy, true)
+                        .addField("Buy Median", medBuy, true)
+                        .addField("Last buy price", lastBuy, true)
+                        .addField("Buy Z-score*", zBuy, false)
+                        .addField("Supply Range", minSupply + "–" + maxSupply, true)
+                        .addField("Supply Median", medSupply, true)
+                        .addField("Last supply level", lastSupply, true)
+                        .addField("Supply Z-score*", zSupply, false)
+                        .attachFiles(attachment)
+                        .setImage("attachment://graphs.png")
+                        .setTimestamp()
+                        .setFooter('*Z-score represents how many standard deviations from the mean the current price is (negative being cheaper).');
+            
+                        message.channel.send(embed);
+                    });
                 })
-                .then((b64) => {
-                    var matches = b64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/),
-                    response = {};
-
-                    if (matches.length !== 3) {
-                        return new Error('Invalid input string');
-                    }
-
-                    response.type = matches[1];
-                    response.data = new Buffer.from(matches[2], 'base64');
-
-                    return response.data;
-                })
-                .then((img) => {
-                    // Generate embed
-                    const attachment = new Discord.MessageAttachment(img, 'graphs.png');
-        
-                    const embed = new Discord.MessageEmbed()
-                    .setColor('#f9a602')
-                    .setTitle('GW2 Price Checker')
-                    .setURL('https://github.com/Perlkonig/gw2-bot-itemprices')
-                    // .setAuthor('Aaron Dalton', undefined, 'https://www.perlkonig.com')
-                    .setDescription(item.name)
-                    // .setThumbnail('https://i.imgur.com/wSTFkRM.png')
-                    .addField(pruned.buy.length + " datapoints over " + days + " days (" + dateFirst + " to " + dateLast + ")", "\u200B")
-                    .addField("Sell Range", minSell + "–" + maxSell, true)
-                    .addField("Sell Median", medSell, true)
-                    .addField("Last sell price", lastSell, true)
-                    .addField("Sell Z-score*", zSell, false)
-                    .addField("Buy Range", minBuy + "–" + maxBuy, true)
-                    .addField("Buy Median", medBuy, true)
-                    .addField("Last buy price", lastBuy, true)
-                    .addField("Buy Z-score*", zBuy, true)
-                    .attachFiles(attachment)
-                    .setImage("attachment://graphs.png")
-                    .setTimestamp()
-                    .setFooter('*Z-score represents how many standard deviations from the mean the current price is (negative being cheaper).');
-        
-                    message.channel.send(embed);
-                });
             })
         })
     }
