@@ -17,7 +17,7 @@
     "discord.js": "^12.2.0",
     "fetch": "^1.1.0",
     "merge-images": "^2.0.0",
-    "moment": "^2.27.0",
+    "moment": "^2.29.4",
     "puppeteer": "^5.2.1",
     "simple-statistics": "^7.1.0"
   },
